@@ -2,114 +2,103 @@ import csv
 import datetime
 import json
 import os
+import random
+import re
 import time
 from pathlib import Path
 
-import dateutil
+import numpy as np
+import pandas as pd
 import requests
 import tweepy
 from dotenv import load_dotenv
 
 
-def create_url(keyword, start_date, end_date, max_results=10):
-    search_url = "https://api.twitter.com/2/tweets/search/all"  # Change to the endpoint you want to collect data from
+def partition_tweets_by_days(total_amount_of_tweets, start_time, end_time):
+    print(f"\n{'-' * 4}DATE PARTIONING{'-' * 60}")
+    # get total amount of days between dates
+    total_amount_of_days = (end_time - start_time).days
+    print(f"Total amount of days: {total_amount_of_days}")
 
-    # change params based on the endpoint you are using
-    query_params = {'query': keyword,
-                    'start_time': start_date,
-                    'end_time': end_date,
-                    'max_results': max_results,
-                    'expansions': 'author_id,in_reply_to_user_id,geo.place_id',
-                    'tweet.fields': 'id,text,author_id,in_reply_to_user_id,geo,conversation_id,created_at,'
-                                    'lang,public_metrics,referenced_tweets,reply_settings,source',
-                    'user.fields': 'id,name,username,created_at,description,public_metrics,verified',
-                    'place.fields': 'full_name,id,country,country_code,geo,name,place_type',
-                    'next_token': {}}
-    return (search_url, query_params)
+    tweets_per_day = int((total_amount_of_tweets - (total_amount_of_tweets % total_amount_of_days))
+                         / total_amount_of_days)
+    assert tweets_per_day >= 10, "Amount of tweets per day must be greater than 10, else query will fail"
+    print(f"There will be {tweets_per_day} collected for each day in range")
 
+    # create date ranges
+    day_ranges = []
+    for day_offset in range(total_amount_of_days):
+        start_time_i = start_time + datetime.timedelta(days=day_offset)
+        end_time_i = start_time_i + datetime.timedelta(days=1)
+        day_ranges.append((start_time_i, end_time_i))
 
-def connect_to_endpoint(url, headers, params, next_token=None):
-    params['next_token'] = next_token  # params object received from create_url function
-    response = requests.request("GET", url, headers=headers, params=params)
-    print("Endpoint Response Code: " + str(response.status_code))
-    if response.status_code != 200:
-        raise Exception(response.status_code, response.text)
-    return response.json()
+    print(f"Created {len(day_ranges)} day partitions, start date: {day_ranges[0][0]}, end date: {day_ranges[-1][1]}")
+    print(f"{'-' * 79}\n")
+    return tweets_per_day, day_ranges
 
 
-def create_headers(bearer_token):
-    headers = {"Authorization": "Bearer {}".format(bearer_token)}
-    return headers
+def extract_information_from_tweet(tweet):
+    tweet_id = tweet["id"]
+    lang = tweet["lang"]
+    author_id = tweet["author_id"]
+    created_at = tweet["created_at"]
+    source = tweet["source"]
+    text = re.sub(r"\s\s+", " ", tweet["text"].strip())
+    if "geo" in tweet:
+        geo = tweet["geo"]["place_id"]
+    else:
+        geo = np.nan
+
+    # metrics
+    retweet_count = tweet["public_metrics"]["retweet_count"]
+    reply_count = tweet["public_metrics"]["reply_count"]
+    like_count = tweet["public_metrics"]["like_count"]
+    quote_count = tweet["public_metrics"]["quote_count"]
+
+    return [tweet_id, lang, author_id, created_at, source, text, geo, retweet_count, reply_count, like_count,
+            quote_count]
 
 
-def main():
-    dotenv_path = Path(".env")
-    load_dotenv(dotenv_path=dotenv_path)
-    bearer_token = os.environ.get("BEARER_TOKEN")
-    consumer_key = os.environ.get("API_KEY")
-    consumer_secret = os.environ.get("API_KEY_SECRET")
+def main(total_amount_of_tweets=100):
+    search_query = "Elon musk"
+    headers = ["tweet_id", "lang", "author_id", "created_at", "source", "text", "geo", "retweet_count", "reply_count",
+               "like_count", "quote_count"]
+    start_date = datetime.datetime.strptime("01/06/2022 00:00", "%d/%m/%Y %H:%M")
+    end_date = datetime.datetime.strptime("06/06/2022 00:00", "%d/%m/%Y %H:%M")
+    print(f"Started search for tweet query '{search_query}' in date range: {start_date} -> {end_date}")
 
-    access_token = os.environ.get("ACCESS_TOKEN")
-    access_token_secret = os.environ.get("ACCESS_TOKEN_SECRET")
-    print(f"Auth info {consumer_key} {consumer_secret} {access_token} {access_token_secret}")
-    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
+    tweets_per_day, date_ranges = partition_tweets_by_days(total_amount_of_tweets=total_amount_of_tweets,
+                                                           start_time=start_date, end_time=end_date)
+    # prepare twitter client
+    client = prepare_twitter_clients()
 
-    start_date = datetime.datetime(2021, 1, 19, 12, 00, 00)
-    end_date = datetime.datetime(2021, 1, 19, 13, 00, 00)
-    print("Start ... ")
-    # api = tweepy.API(auth)
+    # TODO add saving to file when array to big to fit in memory
+    loaded_tweets_arr = []
+    request_count = 0
+    start_time = time.time()
+    for start_date_i, end_date_i in date_ranges:
+        print(f"\nCollecting '{tweets_per_day}' tweets for date range: {start_date_i} -> {end_date_i}")
+        query_params = prepare_query_parameters(max_results=tweets_per_day,
+                                                start_time=start_date_i, end_time=end_date_i)
+        # TODO pay attention to not exceed 15 minute query limits (900 requests per 15 minutes?)
+        tweets = client.search_all_tweets(search_query, **query_params)
 
-    # tweets = tweepy.Cursor(api.search_tweets, q=search_query, lang="en")
-    search_query = 'Elon musk'
-    # client = tweepy.Client(consumer_key=consumer_key,
-    #                        consumer_secret=consumer_secret,
-    #                        access_token=access_token,
-    #                        access_token_secret=access_token_secret)
-    client = tweepy.Client(bearer_token=bearer_token)
-    # no spaces between words in fields!
-    params = {"max_results": 10,
-              "start_time": start_date,
-              "end_time": end_date,
-              "tweet_fields": "id,text,author_id,in_reply_to_user_id,geo,conversation_id,created_at,lang,"
-                              "public_metrics,referenced_tweets,reply_settings,source",
-              "user_fields": "id,name,username,created_at,description,public_metrics,verified",
-              "place_fields": "full_name,id,country,country_code,geo,name,place_type",
-    }
-    tweets = client.search_all_tweets(search_query, **params)
-    for i, tweet in enumerate(tweets.data):
-        print(f"\nTweet: {i}")
-        print(tweet)
-        print(tweet.text)
+        for i, tweet in enumerate(tweets.data):
+            print(f"Tweet: {i + 1}")
+            current_tweet = extract_information_from_tweet(tweet)
+            loaded_tweets_arr.append(current_tweet)
 
-        tweet_id = tweet["id"]
-        lang = tweet["lang"]
-        author_id = tweet["author_id"]
-        created_at = tweet["created_at"]
-        source = tweet["source"]
-        text = tweet["text"]
-        if "geo" in tweet:
-            geo = tweet["geo"]["place_id"]
-        else:
-            geo = " "
+        request_count += 1
+        time.sleep(0.5 + random.random() * 2)
+        if request_count > 300:
+            print("Request limit reached, waiting 15 minutes")
+            time.sleep(15 * 60)
 
-        # metrics
-        retweet_count = tweet["public_metrics"]["retweet_count"]
-        reply_count = tweet["public_metrics"]["reply_count"]
-        like_count = tweet["public_metrics"]["like_count"]
-        quote_count = tweet["public_metrics"]["quote_count"]
-
-        res = [author_id, created_at, geo, tweet_id, lang, like_count, quote_count, reply_count, retweet_count, source,
-               text]
-        print(res)
-        print("")
-
-    # tweets = tweepy.Cursor(api.search_tweets,
-    #                        q=search_query,
-    #                        lang="en",
-    #                        since=start_date,
-    #                        until=end_date,
-    #                        result_type="recent").items(2)
+    print(f"Finished collecting tweets in {time.time() - start_time} seconds")
+    tweet_df = pd.DataFrame(loaded_tweets_arr)
+    tweet_df.columns = headers
+    tweet_df.to_csv("tweets.csv", index=False)
+    print(f"Saved tweets to file: tweets.csv")
 
 
 def get_bearer_token():
@@ -118,8 +107,21 @@ def get_bearer_token():
     return os.environ.get("BEARER_TOKEN")
 
 
+def prepare_query_parameters(max_results, start_time, end_time):
+    # no spaces between words in fields!
+    params = {"max_results": max_results,
+              "start_time": start_time,
+              "end_time": end_time,
+              "tweet_fields": "id,text,author_id,in_reply_to_user_id,geo,conversation_id,created_at,lang,"
+                              "public_metrics,referenced_tweets,reply_settings,source",
+              "user_fields": "id,name,username,created_at,description,public_metrics,verified",
+              "place_fields": "full_name,id,country,country_code,geo,name,place_type",
+              }
+    return params
+
+
 def prepare_twitter_clients():
-    dotenv_path = Path("./../.env")
+    dotenv_path = Path(".env")
     load_dotenv(dotenv_path=dotenv_path)
 
     # consumer_key = os.environ.get("API_KEY")
@@ -127,29 +129,22 @@ def prepare_twitter_clients():
     # access_token = os.environ.get("ACCESS_TOKEN")
     # access_token_secret = os.environ.get("ACCESS_TOKEN_SECRET")
     bearer_token = os.environ.get("BEARER_TOKEN")
+    print(f"Loaded bearer token ... ")
 
-    # auth = tweepy.OAuth1UserHandler(
-    #   consumer_key,
-    #   consumer_secret,
-    #   access_token,
-    #   access_token_secret
-    # )
-    #
-    # api = tweepy.API(auth)
     client = tweepy.Client(bearer_token=bearer_token)
+    print("Client created\n")
     return client
 
-
-def query_tweets(query, client):
-    # Replace with your own search query
-    query = 'from:suhemparack -is:retweet'
-
-    tweets = client.search_recent_tweets(query=query, tweet_fields=['context_annotations', 'created_at'],
-                                         max_results=100)
-
-    print("Tweet time")
-    for tweet in tweets.data:
-        print(tweet.text)
-        if len(tweet.context_annotations) > 0:
-            print(tweet.context_annotations)
-        break
+# def query_tweets(query, client):
+#     # Replace with your own search query
+#     query = 'from:suhemparack -is:retweet'
+#
+#     tweets = client.search_recent_tweets(query=query, tweet_fields=['context_annotations', 'created_at'],
+#                                          max_results=100)
+#
+#     print("Tweet time")
+#     for tweet in tweets.data:
+#         print(tweet.text)
+#         if len(tweet.context_annotations) > 0:
+#             print(tweet.context_annotations)
+#         break
