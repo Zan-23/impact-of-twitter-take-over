@@ -184,12 +184,13 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
     for start_time_i, end_time_i in date_ranges:
         # TODO randomness of the tweets could be introduced by randomly sampling a time interval from which the
         #  data should be collected random hour and minute etc.
-        print(f"\nCollecting '{tweets_per_day}' tweets for date range: {start_time_i} -> {end_time_i}")
         query_params = prepare_parameter_json(query=search_query, max_results=tweets_per_day,
                                               start_time=start_time_i, end_time=end_time_i)
 
         new_url = get_api_url()
         json_response, req_remaining = connect_to_endpoint(new_url, headers, query_params)
+        print(f"\nCollected '{len(json_response['data'])}' (should be {tweets_per_day}) "
+              f"tweets for date range: {start_time_i} -> {end_time_i}")
 
         for i, tweet in enumerate(json_response["data"]):
             current_tweet = extract_information_from_tweet(tweet)
@@ -208,7 +209,7 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
             time.sleep(15 * 60)
         else:
             print(f"Requests remaining: {req_remaining}")
-            time.sleep(0.5 + random.random())
+            time.sleep(0.01 + random.random() * 0.1)
 
     print(f"\nFinished gathering tweets, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
     append_to_csv(csv_file_name, loaded_tweets_arr)

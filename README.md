@@ -1,7 +1,24 @@
 # Impact of Twitter take over by Elon Musk on its users
 
 In this project we will be analyzing the impact of Elon Musk's take over of Twitter on its users. 
-We will be using the Twitter API to collect tweets and analyze them using the Natural Language Processing.
+We will be using the Twitter API to collect tweets and analyze them using the Natural Language Processing. 
+
+## Environment Setup
+Before we start our environment and downloading of the data, make sure to run the following command to install 
+dependencies:
+> pip install -r requirements.txt    
+ 
+or 
+> conda install --yes --file requirements.txt
+
+Then also make sure to create a file `.env` in the root directory of the project and add the following lines:
+```
+API_KEY=<your info>
+API_KEY_SECRET=<your info>
+BEARER_TOKEN=<your info>
+ACCESS_TOKEN=<your info>
+ACCESS_TOKEN_SECRET=<your info>
+```
 
 
 ## Data Collection
