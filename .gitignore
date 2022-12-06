@@ -1,3 +1,7 @@
+# Data dumps in data
+data/*.csv
+
+
 # PyCharm
 .idea
 

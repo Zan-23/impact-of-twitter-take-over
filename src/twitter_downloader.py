@@ -78,18 +78,24 @@ def main(total_amount_of_tweets=100):
     start_time = time.time()
     for start_date_i, end_date_i in date_ranges:
         print(f"\nCollecting '{tweets_per_day}' tweets for date range: {start_date_i} -> {end_date_i}")
-        query_params = prepare_query_parameters(max_results=tweets_per_day,
-                                                start_time=start_date_i, end_time=end_date_i)
-        # TODO pay attention to not exceed 15 minute query limits (900 requests per 15 minutes?)
-        tweets = client.search_all_tweets(search_query, **query_params)
+        try:
+            query_params = prepare_query_parameters(max_results=tweets_per_day,
+                                                    start_time=start_date_i, end_time=end_date_i)
+            # TODO pay attention to not exceed 15 minute query limits (900 requests per 15 minutes?)
+            tweets = client.search_all_tweets(search_query, **query_params)
 
-        for i, tweet in enumerate(tweets.data):
-            print(f"Tweet: {i + 1}")
-            current_tweet = extract_information_from_tweet(tweet)
-            loaded_tweets_arr.append(current_tweet)
+            for i, tweet in enumerate(tweets.data):
+                print(f"Tweet: {i + 1}")
+                current_tweet = extract_information_from_tweet(tweet)
+                loaded_tweets_arr.append(current_tweet)
 
-        request_count += 1
-        time.sleep(0.5 + random.random() * 2)
+            request_count += 1
+            time.sleep(0.5 + random.random() * 2)
+        # catch Twitter API errors
+        except tweepy.errors.TooManyRequests as e:
+            # TODO
+            print(f"Too many requests 'e'! At request count: {request_count}")
+            break
         if request_count > 300:
             print("Request limit reached, waiting 15 minutes")
             time.sleep(15 * 60)
@@ -107,9 +113,10 @@ def get_bearer_token():
     return os.environ.get("BEARER_TOKEN")
 
 
-def prepare_query_parameters(max_results, start_time, end_time):
+def prepare_query_parameters(query, max_results, start_time, end_time):
     # no spaces between words in fields!
-    params = {"max_results": max_results,
+    params = {"query": query,
+              "max_results": max_results,
               "start_time": start_time,
               "end_time": end_time,
               "tweet_fields": "id,text,author_id,in_reply_to_user_id,geo,conversation_id,created_at,lang,"

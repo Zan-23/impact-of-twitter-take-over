@@ -10,27 +10,47 @@ from src.twitter_downloader import get_bearer_token, partition_tweets_by_days, e
 
 
 def get_api_url():
-    # endpoint for all tweets, not just recent ones
+    """
+    :return: Returns the API url for the Twitter API 2
+    """
     search_url = "https://api.twitter.com/2/tweets/search/all"
     return search_url
 
 
-def connect_to_endpoint(url, headers, params, next_token=None):
-    # next token is given from request if there are more available tweets
-    params['next_token'] = next_token
+def connect_to_endpoint(url, headers, params):
+    """
+    Sends a GET request to the Twitter API 2 endpoint, and retrieves the response. If status code is not 200, then it
+    raises the exception. It also gets the count of how many request we can make in the next 15-minute window.
+
+    # TODO should next_token functionality be implemented? token is given from request if there are more available tweets
+    :param url: String. The url of the endpoint.
+    :param headers: Dictionary. The headers of the request, should just contain bearer token.
+    :param params: Dictionary. The parameters of the request, specified in prepare_parameter_json() function.
+    :return: Dictionary/json of the response, Integer of how many requests we can make in the next 15-minute window.
+    """
     response = requests.request("GET", url, headers=headers, params=params)
     if response.status_code != 200:
         raise Exception(response.status_code, response.text)
 
     request_remaining = int(response.headers["x-rate-limit-remaining"])
-    response_code = response.status_code
-
     return response.json(), request_remaining
 
 
 def prepare_parameter_json(query, max_results, start_time, end_time):
-    # time has to be in RFC 3339 format
-    # no spaces between words in fields!
+    """
+    Prepares the parameter json for the request to the Twitter API 2 endpoint. The parameters are specified in the
+    documentation of the endpoint:
+    https://developer.twitter.com/en/docs/twitter-api/tweets/search/api-reference/get-tweets-search-all
+
+    Time in start_time and end_time should be in RFC 3339 format, e.g. 2021-03-01T00:00:00Z and there has to be
+    no space between words in .fields parameters.
+
+    :param query: String. The query to search for.
+    :param max_results: Integer. The maximum number of results to return.
+    :param start_time: Datetime object. The start time of the time window to search for tweets.
+    :param end_time: Datetime object. The end time of the time window to search for tweets.
+    :return: Dictionary. The parameter json.
+    """
     params = {"query": query,
               "max_results": max_results,
               "start_time": start_time.isoformat() + "Z",
@@ -46,6 +66,10 @@ def prepare_parameter_json(query, max_results, start_time, end_time):
 
 
 def create_csv_file():
+    """
+    Creates a csv file with the name of the current date/time and write the column names to it.
+    :return: String. The name of the csv file.s
+    """
     curr_date = datetime.datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
     column_names = ["tweet_id", "lang", "author_id", "created_at", "source", "text", "geo", "retweet_count",
                     "reply_count", "like_count", "quote_count"]
@@ -66,13 +90,16 @@ def append_to_csv(file_name, tweet_arr):
         writer.writerows(tweet_arr)
 
 
-def main_direct_req(total_amount_of_tweets=30):
+def main_direct_req(total_amount_of_tweets):
     """
-    Info for building queries: https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query
-    Status codes https://developer.twitter.com/en/docs/twitter-api/rate-limits#headers-and-codes
+    Main function of the script. It gets the bearer token, prepares the parameter json, and generate an array of date
+    start and date end. It then iterates through the array and makes a request to the Twitter API 2 endpoint, for each
+    range and gets certain amount of tweets from it. It then writes the tweets to a csv file.
 
-    :param total_amount_of_tweets:
-    :return:
+    Info for building queries: https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query
+    Info for status codes: https://developer.twitter.com/en/docs/twitter-api/rate-limits#headers-and-codes
+
+    :param total_amount_of_tweets: Integer. The total amount of tweets to retrieve.
     """
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
@@ -88,14 +115,13 @@ def main_direct_req(total_amount_of_tweets=30):
     loaded_tweets_arr = []
     csv_file_name = create_csv_file()
     start_time = time.time()
-    next_token = None
     for start_time_i, end_time_i in date_ranges:
         print(f"\nCollecting '{tweets_per_day}' tweets for date range: {start_time_i} -> {end_time_i}")
         query_params = prepare_parameter_json(query=search_query, max_results=tweets_per_day,
                                               start_time=start_time_i, end_time=end_time_i)
 
         new_url = get_api_url()
-        json_response, req_remaining = connect_to_endpoint(new_url, headers, query_params, next_token)
+        json_response, req_remaining = connect_to_endpoint(new_url, headers, query_params)
 
         for i, tweet in enumerate(json_response["data"]):
             current_tweet = extract_information_from_tweet(tweet)
@@ -120,14 +146,3 @@ def main_direct_req(total_amount_of_tweets=30):
     append_to_csv(csv_file_name, loaded_tweets_arr)
     print(f"Finished collecting tweets in {time.time() - start_time} seconds")
 
-    # if "next_token" in json_response["meta"]:
-    #     # Save the token to use for next call
-    #     next_token = json_response["meta"]["next_token"]
-    #     print("Using next token: ", next_token)
-    #     # don't increment and get the next page
-    # else:
-    #     date_range_index += 1
-    #     print("No more tokens. Next date range index: ", date_range_index)
-    #
-    #     # Since this is the final request, turn flag to false to move to the next time period.
-    #     next_token = None
