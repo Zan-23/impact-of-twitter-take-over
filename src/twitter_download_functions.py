@@ -154,7 +154,7 @@ def get_bearer_token():
     return os.environ.get("BEARER_TOKEN")
 
 
-def download_tweets(total_amount_of_tweets):
+def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_time="03/06/2022 00:00"):
     """
     Main function of the script. It gets the bearer token, prepares the parameter json, and generate an array of date
     start and date end. It then iterates through the array and makes a request to the Twitter API 2 endpoint, for each
@@ -164,13 +164,15 @@ def download_tweets(total_amount_of_tweets):
     Info for status codes: https://developer.twitter.com/en/docs/twitter-api/rate-limits#headers-and-codes
 
     :param total_amount_of_tweets: Integer. The total amount of tweets to retrieve.
+    :param start_time: String. The start time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
+    :param end_time: String. The end time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
     """
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
     search_query = "Elon musk lang:en place_country:US -is:reply -is:retweet -is:quote"
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
-    start_date = datetime.datetime.strptime("01/06/2022 00:00", "%d/%m/%Y %H:%M")
-    end_date = datetime.datetime.strptime("03/06/2022 00:00", "%d/%m/%Y %H:%M")
+    start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
+    end_date = datetime.datetime.strptime(end_time, "%d/%m/%Y %H:%M")
     print(f"Started search for tweet query '{search_query}' in date range: {start_date} -> {end_date}")
 
     tweets_per_day, date_ranges = partition_tweets_by_days(total_amount_of_tweets=total_amount_of_tweets,
@@ -180,6 +182,8 @@ def download_tweets(total_amount_of_tweets):
     csv_file_name = create_csv_file()
     start_time = time.time()
     for start_time_i, end_time_i in date_ranges:
+        # TODO randomness of the tweets could be introduced by randomly sampling a time interval from which the
+        #  data should be collected random hour and minute etc.
         print(f"\nCollecting '{tweets_per_day}' tweets for date range: {start_time_i} -> {end_time_i}")
         query_params = prepare_parameter_json(query=search_query, max_results=tweets_per_day,
                                               start_time=start_time_i, end_time=end_time_i)
