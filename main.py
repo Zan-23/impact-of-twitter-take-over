@@ -1,13 +1,9 @@
 
-# def main():
-#     print("Start ... ")
-from src.twitter_download_raw import main_direct_req
-from src.twitter_downloader import main
+from src.twitter_download_raw import download_tweets
+
 
 if __name__ == "__main__":
-    # bla bla
-    # main()
-    main_direct_req()
+    download_tweets(total_amount_of_tweets=30)
 
 
 

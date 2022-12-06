@@ -1,12 +1,14 @@
 import csv
 import datetime
+import os
 import random
+import re
 import time
+from pathlib import Path
 
-import pandas as pd
+import numpy as np
 import requests
-
-from src.twitter_downloader import get_bearer_token, partition_tweets_by_days, extract_information_from_tweet
+from dotenv import load_dotenv
 
 
 def get_api_url():
@@ -90,7 +92,69 @@ def append_to_csv(file_name, tweet_arr):
         writer.writerows(tweet_arr)
 
 
-def main_direct_req(total_amount_of_tweets):
+def partition_tweets_by_days(total_amount_of_tweets, start_time, end_time):
+    """
+    Function creates an array of tuples, where each tuple contains the start and end time of a day. It also assigns an
+    equal number of tweets to get for each day.
+
+    :param total_amount_of_tweets: Integer. The total amount of tweets to get.
+    :param start_time: Datetime object. The start time of the time window to search for tweets.
+    :param end_time: Datetime object. The end time of the time window to search for tweets.
+    :return: Array of tuples, Int. Each tuple contains the start and end time of a day and the integer is the amount of
+    tweets to get for each day.
+    """
+    print(f"\n{'-' * 4}DATE PARTIONING{'-' * 60}")
+    # get total amount of days between dates
+    total_amount_of_days = (end_time - start_time).days
+    print(f"Total amount of days: {total_amount_of_days}")
+
+    tweets_per_day = int((total_amount_of_tweets - (total_amount_of_tweets % total_amount_of_days))
+                         / total_amount_of_days)
+    assert 500 >= tweets_per_day >= 10, "Amount of tweets per day must be greater than 10 and smaller than 500, " \
+                                        "else query will fail"
+    print(f"There will be {tweets_per_day} collected for each day in range")
+
+    # create date ranges
+    day_ranges = []
+    for day_offset in range(total_amount_of_days):
+        start_time_i = start_time + datetime.timedelta(days=day_offset)
+        end_time_i = start_time_i + datetime.timedelta(days=1)
+        day_ranges.append((start_time_i, end_time_i))
+
+    print(f"Created {len(day_ranges)} day partitions, start date: {day_ranges[0][0]}, end date: {day_ranges[-1][1]}")
+    print(f"{'-' * 79}\n")
+    return tweets_per_day, day_ranges
+
+
+def extract_information_from_tweet(tweet):
+    tweet_id = tweet["id"]
+    lang = tweet["lang"]
+    author_id = tweet["author_id"]
+    created_at = tweet["created_at"]
+    source = tweet["source"]
+    text = re.sub(r"\s\s+", " ", tweet["text"].strip())
+    if "geo" in tweet:
+        geo = tweet["geo"]["place_id"]
+    else:
+        geo = np.nan
+
+    # metrics
+    retweet_count = tweet["public_metrics"]["retweet_count"]
+    reply_count = tweet["public_metrics"]["reply_count"]
+    like_count = tweet["public_metrics"]["like_count"]
+    quote_count = tweet["public_metrics"]["quote_count"]
+
+    return [tweet_id, lang, author_id, created_at, source, text, geo, retweet_count, reply_count, like_count,
+            quote_count]
+
+
+def get_bearer_token():
+    dotenv_path = Path(".env")
+    load_dotenv(dotenv_path=dotenv_path)
+    return os.environ.get("BEARER_TOKEN")
+
+
+def download_tweets(total_amount_of_tweets):
     """
     Main function of the script. It gets the bearer token, prepares the parameter json, and generate an array of date
     start and date end. It then iterates through the array and makes a request to the Twitter API 2 endpoint, for each
@@ -144,5 +208,5 @@ def main_direct_req(total_amount_of_tweets):
 
     print(f"\nFinished gathering tweets, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
     append_to_csv(csv_file_name, loaded_tweets_arr)
-    print(f"Finished collecting tweets in {time.time() - start_time} seconds")
+    print(f"Finished collecting tweets in {time.time() - start_time:.2f} seconds")
 
