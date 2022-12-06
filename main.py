@@ -1,5 +1,5 @@
 
-from src.twitter_download_raw import download_tweets
+from src.twitter_download_functions import download_tweets
 
 
 if __name__ == "__main__":
