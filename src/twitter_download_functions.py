@@ -24,7 +24,6 @@ def connect_to_endpoint(url, headers, params):
     Sends a GET request to the Twitter API 2 endpoint, and retrieves the response. If status code is not 200, then it
     raises the exception. It also gets the count of how many request we can make in the next 15-minute window.
 
-    # TODO should next_token functionality be implemented? token is given from request if there are more available tweets
     :param url: String. The url of the endpoint.
     :param headers: Dictionary. The headers of the request, should just contain bearer token.
     :param params: Dictionary. The parameters of the request, specified in prepare_parameter_json() function.
