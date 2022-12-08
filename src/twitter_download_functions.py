@@ -38,7 +38,7 @@ def connect_to_endpoint(url, headers, params):
     return response.json(), request_remaining
 
 
-def prepare_parameter_json(query, max_results, start_time, end_time):
+def prepare_parameter_json(query, max_results, start_time, end_time, next_token=None):
     """
     Prepares the parameter json for the request to the Twitter API 2 endpoint. The parameters are specified in the
     documentation of the endpoint:
@@ -51,6 +51,7 @@ def prepare_parameter_json(query, max_results, start_time, end_time):
     :param max_results: Integer. The maximum number of results to return.
     :param start_time: Datetime object. The start time of the time window to search for tweets.
     :param end_time: Datetime object. The end time of the time window to search for tweets.
+    :param next_token: TODO
     :return: Dictionary. The parameter json.
     """
     params = {"query": query,
@@ -62,7 +63,7 @@ def prepare_parameter_json(query, max_results, start_time, end_time):
                               "public_metrics,referenced_tweets,reply_settings,source",
               "user.fields": "id,name,username,created_at,description,public_metrics,verified",
               "place.fields": "full_name,id,country,country_code,geo,name,place_type",
-              "next_token": {}
+              "next_token": next_token
               }
     return params
 
@@ -134,7 +135,10 @@ def extract_information_from_tweet(tweet):
     source = tweet["source"]
     text = re.sub(r"\s\s+", " ", tweet["text"].strip())
     if "geo" in tweet:
-        geo = tweet["geo"]["place_id"]
+        if "place_id" in tweet["geo"]:
+            geo = tweet["geo"]["place_id"]
+        else:
+            geo = np.nan
     else:
         geo = np.nan
 
@@ -169,7 +173,8 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
     """
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
-    search_query = "Elon musk lang:en place_country:US -is:reply -is:retweet -is:quote"
+    search_query = "#vegan OR #vegetarian OR #netflix OR #fitness lang:en place_country:US " \
+                   "-is:retweet -is:quote -has:links"   # put it out to get replies, -is:reply
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
     start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
     end_date = datetime.datetime.strptime(end_time, "%d/%m/%Y %H:%M")
@@ -180,36 +185,51 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
 
     loaded_tweets_arr = []
     csv_file_name = create_csv_file()
+    twitter_api_url = get_api_url()
     start_time = time.time()
     for start_time_i, end_time_i in date_ranges:
         # TODO randomness of the tweets could be introduced by randomly sampling a time interval from which the
         #  data should be collected random hour and minute etc.
-        query_params = prepare_parameter_json(query=search_query, max_results=tweets_per_day,
-                                              start_time=start_time_i, end_time=end_time_i)
+        next_token = None
+        tmp_tweets_per_day = tweets_per_day
+        while True:
+            query_params = prepare_parameter_json(query=search_query, max_results=tmp_tweets_per_day,
+                                                  start_time=start_time_i, end_time=end_time_i, next_token=next_token)
 
-        new_url = get_api_url()
-        json_response, req_remaining = connect_to_endpoint(new_url, headers, query_params)
-        print(f"\nCollected '{len(json_response['data'])}' (should be {tweets_per_day}) "
-              f"tweets for date range: {start_time_i} -> {end_time_i}")
+            json_response, req_remaining = connect_to_endpoint(twitter_api_url, headers, query_params)
+            if "data" not in json_response is None or len(json_response["data"]) == 0:
+                print("No data found")
+                break
+            print(f"\nCollected '{len(json_response['data'])}' (should be {tmp_tweets_per_day}) "
+                  f"tweets for date range: {start_time_i} -> {end_time_i}")
 
-        for i, tweet in enumerate(json_response["data"]):
-            current_tweet = extract_information_from_tweet(tweet)
-            loaded_tweets_arr.append(current_tweet)
+            for i, tweet in enumerate(json_response["data"]):
+                current_tweet = extract_information_from_tweet(tweet)
+                loaded_tweets_arr.append(current_tweet)
 
-        # Write to file every 1000 requests
-        if len(loaded_tweets_arr) > 1000:
-            print(f"Tweet threshold reached, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
-            print("Elements in array: ", len(loaded_tweets_arr[0]))
-            append_to_csv(csv_file_name, loaded_tweets_arr)
-            loaded_tweets_arr = []
+            # Write to file every 1000 requests
+            if len(loaded_tweets_arr) > 1000:
+                print(f"Tweet threshold reached, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
+                print("Elements in array: ", len(loaded_tweets_arr[0]))
+                append_to_csv(csv_file_name, loaded_tweets_arr)
+                loaded_tweets_arr = []
 
-        if req_remaining < 5:
-            # if we almost the limit wait for 15 minutes
-            print("No requests remaining, waiting for 15 minutes")
-            time.sleep(15 * 60)
-        else:
-            print(f"Requests remaining: {req_remaining}")
-            time.sleep(0.01 + random.random() * 0.1)
+            if req_remaining < 5:
+                # if we almost the limit wait for 15 minutes
+                print("No requests remaining, waiting for 15 minutes")
+                time.sleep(15 * 60)
+            else:
+                print(f"Requests remaining: {req_remaining}")
+                time.sleep(1 + random.random() * 0.2)
+
+            # to get the next page of results
+            tweet_diff = tmp_tweets_per_day - len(json_response["data"])
+            if "next_token" in json_response["meta"] and tweet_diff > 0:
+                tmp_tweets_per_day = 10 if tweet_diff < 10 else tweet_diff
+                print(f"diff: {tweet_diff}, tmp_tweets_per_day: {tmp_tweets_per_day}")
+                next_token = json_response["meta"]["next_token"]
+            else:
+                break
 
     print(f"\nFinished gathering tweets, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
     append_to_csv(csv_file_name, loaded_tweets_arr)
