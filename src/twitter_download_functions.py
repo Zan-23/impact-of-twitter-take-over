@@ -172,7 +172,7 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
     """
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
-    search_query = "#vegan OR #vegetarian OR #netflix OR #fitness lang:en place_country:US " \
+    search_query = "(#vegan OR #vegetarian OR #netflix OR #fitness) lang:en place_country:US " \
                    "-is:retweet -is:quote -has:links"   # put it out to get replies, -is:reply
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
     start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
