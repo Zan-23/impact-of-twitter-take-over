@@ -129,6 +129,7 @@ def partition_day_by_tweets(tweets_per_day, start_time, end_time):
             day_ranges.append((start_time_i, end_time_i))
 
     print(f"Created {len(day_ranges)} day partitions, start date: {day_ranges[0][0]}, end date: {day_ranges[-1][1]}")
+    print(f"At least {len(day_ranges) * tweets_per_interval} tweets will be acquired!")
     print(f"{'-' * 79}\n")
     return tweets_per_interval, day_ranges
 
