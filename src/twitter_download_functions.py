@@ -1,5 +1,6 @@
 import csv
 import datetime
+import math
 import os
 import random
 import re
@@ -73,8 +74,8 @@ def create_csv_file():
     :return: String. The name of the csv file.s
     """
     curr_date = datetime.datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
-    column_names = ["tweet_id", "lang", "author_id", "created_at", "source", "text", "geo", "retweet_count",
-                    "reply_count", "like_count", "quote_count"]
+    column_names = ["tweet_id", "lang", "author_id", "created_at", "text", "geo", "retweet_count", "reply_count",
+                    "like_count", "quote_count"]
     print("Column count: " + str(len(column_names)))
     file_name = f"./data/twitter_dump_at_time_{curr_date}.csv"
     print("Creating csv file: ", file_name)
@@ -90,6 +91,46 @@ def append_to_csv(file_name, tweet_arr):
     with open(file_name, "a", encoding="UTF8", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(tweet_arr)
+
+
+def partition_day_by_tweets(tweets_per_day, start_time, end_time):
+    """
+    Function is very similar to partition_tweets_by_days, but it also partitions the day by minutes into smaller intervals
+    and each interval gets queried separately.
+
+    :param tweets_per_day: Integer. The amount of tweets that should be acquired for each day, if higher than 500,
+    the day is split into multiple time intervals.
+    :param start_time: Datetime object. The start time of the time window to search for tweets.
+    :param end_time: Datetime object. The end time of the time window to search for tweets.
+    :return: Array of tuples, Int. Each tuple contains the start and end time of a day and the integer is the amount of
+    tweets to get for each day.
+    """
+    print(f"\n{'-' * 4}DATE PARTIONING{'-' * 60}")
+    assert tweets_per_day % 10 == 0, "tweets_per_day must be a multiple of 10"
+    # get total amount of days between dates
+    total_amount_of_days = (end_time - start_time).days
+    print(f"Total amount of days: {total_amount_of_days}")
+
+    # calculate how many intervals need to be computed
+    day_splits = math.ceil(tweets_per_day / 500)
+    tweets_per_interval = int(tweets_per_day / day_splits)
+    # create minute offsets for each interval
+    minute_offsets = np.linspace(0, 1440, day_splits + 1, dtype=int)
+    print(f"Day splits: {day_splits}, tweets per interval: {tweets_per_interval}")
+    print(f"Minute offsets ({len(minute_offsets) - 1} intervals): \n{minute_offsets}")
+
+    # create date ranges
+    day_ranges = []
+    for day_offset in range(total_amount_of_days):
+        curr_day = start_time + datetime.timedelta(days=day_offset)
+        for i, value in enumerate(minute_offsets[:-1]):
+            start_time_i = curr_day + datetime.timedelta(minutes=int(value))
+            end_time_i = curr_day + datetime.timedelta(minutes=int(minute_offsets[i + 1]))
+            day_ranges.append((start_time_i, end_time_i))
+
+    print(f"Created {len(day_ranges)} day partitions, start date: {day_ranges[0][0]}, end date: {day_ranges[-1][1]}")
+    print(f"{'-' * 79}\n")
+    return tweets_per_interval, day_ranges
 
 
 def partition_tweets_by_days(total_amount_of_tweets, start_time, end_time):
@@ -131,7 +172,7 @@ def extract_information_from_tweet(tweet):
     lang = tweet["lang"]
     author_id = tweet["author_id"]
     created_at = tweet["created_at"]
-    source = tweet["source"]
+    # source = tweet["source"]
     text = re.sub(r"\s\s+", " ", tweet["text"].strip())
     if "geo" in tweet:
         if "place_id" in tweet["geo"]:
@@ -147,8 +188,7 @@ def extract_information_from_tweet(tweet):
     like_count = tweet["public_metrics"]["like_count"]
     quote_count = tweet["public_metrics"]["quote_count"]
 
-    return [tweet_id, lang, author_id, created_at, source, text, geo, retweet_count, reply_count, like_count,
-            quote_count]
+    return [tweet_id, lang, author_id, created_at, text, geo, retweet_count, reply_count, like_count, quote_count]
 
 
 def get_bearer_token():
@@ -157,7 +197,7 @@ def get_bearer_token():
     return os.environ.get("BEARER_TOKEN")
 
 
-def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_time="03/06/2022 00:00"):
+def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/06/2022 00:00"):
     """
     Main function of the script. It gets the bearer token, prepares the parameter json, and generate an array of date
     start and date end. It then iterates through the array and makes a request to the Twitter API 2 endpoint, for each
@@ -166,29 +206,32 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
     Info for building queries: https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query
     Info for status codes: https://developer.twitter.com/en/docs/twitter-api/rate-limits#headers-and-codes
 
-    :param total_amount_of_tweets: Integer. The total amount of tweets to retrieve.
+    :param tweets_per_day: Integer. The total amount of tweets to retrieve.
     :param start_time: String. The start time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
     :param end_time: String. The end time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
     """
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
-    search_query = "(#vegan OR #vegetarian OR #netflix OR #fitness) lang:en place_country:US " \
-                   "-is:retweet -is:quote -has:links"   # put it out to get replies, -is:reply
+
+    search_query = "(vegar OR #vegan OR vegetarian OR #vegetarian OR netflix OR #netflix OR fitness OR #fitness OR " \
+                   "@elonmusk OR #musk) lang:en -is:retweet -is:quote -has:links -is:reply"
+    # put it out to get replies,
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
     start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
     end_date = datetime.datetime.strptime(end_time, "%d/%m/%Y %H:%M")
     print(f"Started search for tweet query '{search_query}' in date range: {start_date} -> {end_date}")
 
-    tweets_per_day, date_ranges = partition_tweets_by_days(total_amount_of_tweets=total_amount_of_tweets,
-                                                           start_time=start_date, end_time=end_date)
+    # this code is for getting a total amount of tweets
+    # tweets_per_day, date_ranges = partition_tweets_by_days(total_amount_of_tweets=total_amount_of_tweets,
+    #                                                        start_time=start_date, end_time=end_date)
+    tweets_per_day, date_ranges = partition_day_by_tweets(tweets_per_day=tweets_per_day, start_time=start_date,
+                                                          end_time=end_date)
 
     loaded_tweets_arr = []
     csv_file_name = create_csv_file()
     twitter_api_url = get_api_url()
     start_time = time.time()
     for start_time_i, end_time_i in date_ranges:
-        # TODO randomness of the tweets could be introduced by randomly sampling a time interval from which the
-        #  data should be collected random hour and minute etc.
         next_token = None
         tmp_tweets_per_day = tweets_per_day
         while True:
@@ -209,7 +252,6 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
             # Write to file every 1000 requests
             if len(loaded_tweets_arr) > 1000:
                 print(f"Tweet threshold reached, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
-                print("Elements in array: ", len(loaded_tweets_arr[0]))
                 append_to_csv(csv_file_name, loaded_tweets_arr)
                 loaded_tweets_arr = []
 
@@ -219,7 +261,7 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
                 time.sleep(15 * 60)
             else:
                 print(f"Requests remaining: {req_remaining}")
-                time.sleep(1 + random.random() * 0.2)
+                time.sleep(0.4 + random.random() * 0.2)
 
             # to get the next page of results
             tweet_diff = tmp_tweets_per_day - len(json_response["data"])
@@ -233,4 +275,3 @@ def download_tweets(total_amount_of_tweets, start_time="01/06/2022 00:00", end_t
     print(f"\nFinished gathering tweets, appending {len(loaded_tweets_arr)} tweets to file {csv_file_name}!")
     append_to_csv(csv_file_name, loaded_tweets_arr)
     print(f"Finished collecting tweets in {time.time() - start_time:.2f} seconds")
-

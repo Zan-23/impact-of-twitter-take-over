@@ -1,7 +1,6 @@
 
-from src.twitter_download_functions import download_tweets
-
+from src.twitter_download_functions import download_tweets, partition_day_by_tweets
 
 if __name__ == "__main__":
-    download_tweets(total_amount_of_tweets=94500, start_time="01/06/2022 00:00", end_time="07/12/2022 00:00")
-
+    download_tweets(tweets_per_day=8000, start_time="01/06/2022 00:00", end_time="28/12/2022 00:00")
+    # partition_day_by_tweets(1500, "01/06/2022 00:00", "03/06/2022 00:00")
