@@ -214,8 +214,10 @@ def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
 
-    search_query = "(vegar OR #vegan OR vegetarian OR #vegetarian OR netflix OR #netflix OR fitness OR #fitness OR " \
-                   "@elonmusk OR #musk) lang:en -is:retweet -is:quote -has:links -is:reply"
+    search_query = "(vegan OR #vegan OR vegetarian OR #vegetarian OR netflix OR #netflix OR fitness OR #fitness OR " \
+                   "travelTuesday OR #travelTuesday OR @elonmusk) " \
+                   "lang:en -is:retweet -is:quote -has:links -is:reply"
+    #
     # put it out to get replies,
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
     start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
@@ -262,7 +264,7 @@ def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/
                 time.sleep(15 * 60)
             else:
                 print(f"Requests remaining: {req_remaining}")
-                time.sleep(0.4 + random.random() * 0.2)
+                time.sleep(0.6 + random.random() * 0.2)
 
             # to get the next page of results
             tweet_diff = tmp_tweets_per_day - len(json_response["data"])
