@@ -4,12 +4,19 @@ In this project we will be analyzing the impact of Elon Musk's take over of Twit
 We will be using the Twitter API to collect tweets and analyze them using the Natural Language Processing. 
 
 ## Environment Setup
+
+### CUDA drivers
+For installing CUDA drivers, do it this way before the requirements.txt installation:
+> pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+
+### General setup
 Before we start our environment and downloading of the data, make sure to run the following command to install 
 dependencies:
 > pip install -r requirements.txt    
  
 or 
 > conda install --yes --file requirements.txt
+
 
 Then also make sure to create a file `.env` in the root directory of the project and add the following lines:
 ```
