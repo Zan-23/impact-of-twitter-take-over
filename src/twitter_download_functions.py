@@ -198,7 +198,7 @@ def get_bearer_token():
     return os.environ.get("BEARER_TOKEN")
 
 
-def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/06/2022 00:00"):
+def download_tweets(search_query, tweets_per_day, start_time="01/06/2022 00:00", end_time="03/06/2022 00:00"):
     """
     Main function of the script. It gets the bearer token, prepares the parameter json, and generate an array of date
     start and date end. It then iterates through the array and makes a request to the Twitter API 2 endpoint, for each
@@ -207,6 +207,7 @@ def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/
     Info for building queries: https://developer.twitter.com/en/docs/twitter-api/tweets/counts/integrate/build-a-query
     Info for status codes: https://developer.twitter.com/en/docs/twitter-api/rate-limits#headers-and-codes
 
+    :param search_query: String. The query to search for tweets.
     :param tweets_per_day: Integer. The total amount of tweets to retrieve.
     :param start_time: String. The start time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
     :param end_time: String. The end time of the time window to search for tweets. In the format dd/mm/yyyy hh:mm.
@@ -214,10 +215,6 @@ def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/
     bearer_token = get_bearer_token()
     headers = {"Authorization": "Bearer {}".format(bearer_token)}
 
-    search_query = "(vegan OR #vegan OR vegetarian OR #vegetarian OR netflix OR #netflix OR fitness OR #fitness OR " \
-                   "travelTuesday OR #travelTuesday OR @elonmusk) " \
-                   "lang:en -is:retweet -is:quote -has:links -is:reply"
-    #
     # put it out to get replies,
     # -is:reply -is:retweet -is:quote -> ensures we only get original tweets
     start_date = datetime.datetime.strptime(start_time, "%d/%m/%Y %H:%M")
@@ -229,7 +226,6 @@ def download_tweets(tweets_per_day, start_time="01/06/2022 00:00", end_time="03/
     #                                                        start_time=start_date, end_time=end_date)
     tweets_per_day, date_ranges = partition_day_by_tweets(tweets_per_day=tweets_per_day, start_time=start_date,
                                                           end_time=end_date)
-
     loaded_tweets_arr = []
     csv_file_name = create_csv_file()
     twitter_api_url = get_api_url()
