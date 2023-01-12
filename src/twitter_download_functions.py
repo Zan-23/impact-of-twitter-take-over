@@ -260,7 +260,7 @@ def download_tweets(search_query, tweets_per_day, start_time="01/06/2022 00:00",
                 time.sleep(15 * 60)
             else:
                 print(f"Requests remaining: {req_remaining}")
-                time.sleep(0.6 + random.random() * 0.2)
+                time.sleep(1.5 + random.random() * 0.2)
 
             # to get the next page of results
             tweet_diff = tmp_tweets_per_day - len(json_response["data"])
