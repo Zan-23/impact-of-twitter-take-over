@@ -8,3 +8,4 @@ jupyter==1.0.0
 pandas==1.5.2
 numpy==1.22.3
 detoxify==0.5.1
+spacy==3.3.1
