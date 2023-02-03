@@ -10,3 +10,6 @@ numpy==1.22.3
 detoxify==0.5.1
 spacy==3.3.1
 sentence-splitter==1.4
+
+# for plotly svg creation
+python-kaleido==0.2.1
