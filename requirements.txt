@@ -13,3 +13,7 @@ sentence-splitter==1.4
 
 # for plotly svg creation
 python-kaleido==0.2.1
+
+# for t-test
+statsmodels==0.13.2
+pingouin==0.5.3
