@@ -1,8 +1,13 @@
+
+# generates pictures
+*.svg
+
 # Data dumps in data
 data/*.csv
 data/lemmatized/*.csv
 data/raw_hashtags/*.csv
 data/detoxify_toxicity_added_hashtags/*.csv
+data/preprocessed/*.csv
 
 # any zips that might be present
 *.zip
