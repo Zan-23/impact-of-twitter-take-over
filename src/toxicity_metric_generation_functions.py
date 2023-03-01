@@ -8,7 +8,7 @@ from tqdm import tqdm
 from unidecode import unidecode
 
 
-def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, output_file_name: str):
+def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, output_file: str):
     """
     This function gets the csv file with tweets (which should be lemmatized before), it then creates a new dataframe
     with headers and saves it to a file. Then it iterates over the tweets, splits them into sentences, gets the toxicity
@@ -20,11 +20,11 @@ def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_fi
 
     :param model: detoxify.Detoxify. Model to use for toxicity metrics (we used Detoxify('original', device="cuda"))
     :param input_file: String. Name of the csv file with tweets (should be lemmatized before).
-    :param output_file_name: String. Name of the csv file to save the toxicity metrics to.
+    :param output_file: String. Name of the csv file to save the toxicity metrics to.
     """
     print(f"\nStarted generating toxicity metrics for:\n"
           f"-input file: '{input_file}',\n"
-          f"-output file: '{output_file_name}'")
+          f"-output file: '{output_file}'")
     tweets_df = pd.read_csv("./data/lemmatized/" + input_file)
     total_len = len(tweets_df.index)
     tweets_df = tweets_df[tweets_df["lang"] == "en"]
@@ -42,7 +42,7 @@ def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_fi
                                              "identity_attack"]
     toxicity_df = pd.DataFrame(columns=csv_columns)
     # save headers to file
-    toxicity_df.to_csv(output_file_name)
+    toxicity_df.to_csv(output_file)
     # changed this column for lemmatized info
     content_list_p = tweets_df["processed_text"].to_list()
     content_list_raw = tweets_df["text"].to_list()
@@ -52,7 +52,7 @@ def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_fi
     for i in tqdm(range(0, len(tweets_df.index), step)):
         if i % 5000 == 0 and i != 0:
             torch.cuda.empty_cache()
-            toxicity_df.to_csv(output_file_name, mode='a', header=False)
+            toxicity_df.to_csv(output_file, mode='a', header=False)
             # print("At row: {i}. Cleared GPU cache and saved to file")
             toxicity_df = pd.DataFrame(columns=csv_columns)
 
@@ -83,12 +83,12 @@ def upgraded_generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_fi
                                     left_index=True, right_index=True)
         toxicity_df = pd.concat([toxicity_df, merged_tweet_tox], ignore_index=True)
 
-    toxicity_df.to_csv(output_file_name, mode='a', header=False)
+    toxicity_df.to_csv(output_file, mode='a', header=False)
     print(f"Execution took: {time.time() - start_time:.2f} seconds")
-    print(f"Finished saving to file '{output_file_name}'\n")
+    print(f"Finished saving to file '{output_file}'\n")
 
 
-def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, output_file_name: str):
+def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, output_file: str):
     """
     This function is outdated please use: upgraded_generate_toxicity_for_tweet_file instead.
 
@@ -100,11 +100,11 @@ def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, 
 
     :param model: detoxify.Detoxify. Model to use for toxicity metrics (we used Detoxify('original', device="cuda"))
     :param input_file: String. Name of the csv file with tweets (should be lemmatized before).
-    :param output_file_name: String. Name of the csv file to save the toxicity metrics to.
+    :param output_file: String. Name of the csv file to save the toxicity metrics to.
     """
     print(f"\nStarted generating toxicity metrics for:\n"
           f"-input file: '{input_file}',\n"
-          f"-output file: '{output_file_name}'")
+          f"-output file: '{output_file}'")
     tweets_df = pd.read_csv("./data/raw_hashtags/" + input_file)
     total_len = len(tweets_df.index)
     tweets_df = tweets_df[tweets_df["lang"] == "en"]
@@ -122,7 +122,7 @@ def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, 
                                              "identity_attack"]
     toxicity_df = pd.DataFrame(columns=csv_columns)
     # save headers to file
-    toxicity_df.to_csv(output_file_name)
+    toxicity_df.to_csv(output_file)
     content_list = tweets_df["text"].to_list()
 
     # multistep - it should work fine now! You can use it and it should be a bit faster
@@ -131,7 +131,7 @@ def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, 
         if i % 500 == 0 and i != 0:
             # print(f"At row: {i}")
             torch.cuda.empty_cache()
-            toxicity_df.to_csv(output_file_name, mode='a', header=False)
+            toxicity_df.to_csv(output_file, mode='a', header=False)
             # print("Cleared GPU cache and saved to file")
             toxicity_df = pd.DataFrame(columns=csv_columns)
 
@@ -141,6 +141,6 @@ def generate_toxicity_for_tweet_file(model: detoxify.Detoxify, input_file: str, 
                                     left_index=True, right_index=True)
         toxicity_df = pd.concat([toxicity_df, merged_tweet_tox], ignore_index=True)
 
-    toxicity_df.to_csv(output_file_name, mode='a', header=False)
+    toxicity_df.to_csv(output_file, mode='a', header=False)
     print(f"Execution took: {time.time() - start_time:.2f} seconds")
-    print(f"Finished saving to file '{output_file_name}'\n")
+    print(f"Finished saving to file '{output_file}'\n")
