@@ -3,6 +3,8 @@
 In this project we will be analyzing the impact of Elon Musk's take over of Twitter on its users. 
 We will be using the Twitter API to collect tweets and analyze them using the Natural Language Processing. 
 
+[Click to open our presentation poster](poster.pdf)
+
 ## Environment Setup
 
 ### CUDA drivers
