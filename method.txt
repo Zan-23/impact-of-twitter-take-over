@@ -1,0 +1,15 @@
+For the seminar we started by writing a data collection script, that allowed us to gather a specific amount of tweets per day since a given date.
+This also ensured, that all Tweets were at the same time of day, which eliminated another unknown variable.
+In order to get enough data and also gather Tweets made multiple months ago, we used the Twitter academic research access.
+
+We only used non-Retweets and did not use Tweets, which contained a URL, in order to minimize Spam-Tweets.
+By limiting the Tweets to certain topics (Musk, Trump, Vegan, Vegetarian, Uno, Netflix and Fitness),
+we hoped to get a better feeling to what aspects of Twitter might have become more toxic.
+
+The Tweets were then saved inside a CSV, where we could lemmatize them to allow for better toxicity analysis of the Neural Networks we used.
+We first tried to use "Perspective API" for the analysis, but quickly noticed that even with a higher analysis rate,
+which we had to request, we only could do about 10 requests per second, which would have been too slow for our 5 Mio Tweets.
+Instead, we used "Detoxify", which did not need to make requests, increasing the speed significantly.
+We also did a negative and positive word analysis, in order to get another metric of toxicity.
+
+After doing some regression on the data, we came to the conclusion, that in most categories the toxicity did not change, expect Tweets talking about Musk.
