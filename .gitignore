@@ -1,6 +1,7 @@
 
 # generates pictures
 *.svg
+!/report_images/*.svg
 
 # Data dumps in data
 data/*.csv
